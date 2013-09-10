@@ -37,7 +37,7 @@ public class RegistrationController
 			}
 		}
 
-		if (request.getSession().getAttribute("logins")!=null && !request.getSession().getAttribute("logins").equals("")) {
+		if (request.getSession().getAttribute("sessionkey")!=null && !request.getSession().getAttribute("sessionkey").equals("")) {
 			// Если уже залогинились - переходим на форму отправки
 			model.addAttribute("menuActiveItem", "bot");
 			return "bot";			
@@ -66,10 +66,10 @@ public class RegistrationController
 		if (userUID!=null)
 		{
 			model.addAttribute("login", login);
-			request.getSession().setAttribute("logins", userUID);
+			request.getSession().setAttribute("sessionkey", mc.addSessionKeyToUser(userUID));
 			request.getSession().setAttribute("login", login);
 			if (rememberme!=null && rememberme.equals("on")) {
-				Cookie cookie = new Cookie("loginc", userUID);
+				Cookie cookie = new Cookie("loginc", request.getSession().getAttribute("sessionkey").toString());
 				cookie.setMaxAge(60*60*24);
 				cookie.setPath("/");
 				response.addCookie(cookie);
@@ -98,7 +98,7 @@ public class RegistrationController
 
 	private String doLogout(ModelMap model, HttpServletRequest request, HttpServletResponse response)
 	{
-		request.getSession().setAttribute("logins", "");
+		request.getSession().setAttribute("sessionkey", "");
 		request.getSession().setAttribute("login", "");
 		Cookie cookie = new Cookie("loginc", null);
 		cookie.setMaxAge(0);
@@ -157,7 +157,7 @@ public class RegistrationController
 		
 		// Если регистрация успешна
 		// 1. Сохраняем пользователя и автоматически влогиниваем его
-		request.getSession().setAttribute("logins", mc.createUser(uname, grade, login, passwd));
+		request.getSession().setAttribute("sessionkey", mc.addSessionKeyToUser(mc.createUser(uname, grade, login, passwd)));
 		request.getSession().setAttribute("login", login);
 		// 2. Выдаём сообщение и отправляем на правила игры 
 		model.addAttribute("successMessage", "Регистрация прошла успешно");

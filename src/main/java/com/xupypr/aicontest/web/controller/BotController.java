@@ -21,9 +21,10 @@ public class BotController
 	{ RequestMethod.GET, RequestMethod.POST })
 	public String doAction(@PathVariable String action, ModelMap model, HttpServletRequest request, HttpServletResponse response)
 	{
-		String login = (String) request.getSession().getAttribute("logins");
+		MongoConnector mc = new MongoConnector();
+		String userId = mc.getUserIdBySessionKey((String) request.getSession().getAttribute("sessionkey"));
 		boolean admin = request.getSession().getAttribute("login")!=null && request.getSession().getAttribute("login").equals("admin");
-		if (login != null && !login.equals(""))
+		if (userId != null && !userId.equals(""))
 		{
 			if (action != null)
 			{
@@ -46,12 +47,11 @@ public class BotController
 						model.addAttribute("menuActiveItem", "bot");
 						return "bot";
 					}
-					MongoConnector mc = new MongoConnector();
-					if (mc.createBot(login, language, source) != null)
+					if (mc.createBot(userId, language, source) != null)
 					{
 						model.addAttribute("successMessage",
 								"Ваш бот сохранён и в ближайшее время приступит к сражению на арене.");
-						model.addAttribute("events", mc.getArenaEvents(login)); 
+						model.addAttribute("events", mc.getArenaEvents(userId)); 
 						model.addAttribute("menuActiveItem", "arena");
 						return "arena";
 					} else
@@ -71,11 +71,10 @@ public class BotController
 					}
 					if (action.equals("view"))
 					{
-						MongoConnector mc = new MongoConnector();
 						DBObject bot = mc.getBotByUID(id);
 						if (bot != null)
 						{
-							if (bot.get("user").equals(login) || admin)
+							if (bot.get("user").equals(userId) || admin)
 							{
 								model.addAttribute("source", bot.get("source"));
 								return "source";
@@ -94,7 +93,6 @@ public class BotController
 					}
 					if (action.equals("recompile") && admin)
 					{
-							MongoConnector mc = new MongoConnector();
 							mc.recompileBotByUID(id);
 							model.addAttribute("successMessage",
 									"Бот отправлен на перекомпиляцию.");
@@ -104,7 +102,6 @@ public class BotController
 					}
 					if (action.equals("delete") && admin)
 					{
-							MongoConnector mc = new MongoConnector();
 							mc.deleteBotByUID(id);
 							model.addAttribute("successMessage",
 									"Бот удалён.");

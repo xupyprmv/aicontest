@@ -29,7 +29,7 @@
 						 -->
 					</ul>
 					<ul class="nav pull-right">
-					<% if (session.getAttribute("logins")!=null && !session.getAttribute("logins").equals("")) { %>
+					<% if (session.getAttribute("sessionkey")!=null && !session.getAttribute("sessionkey").equals("")) { %>
 						<li>
 							<a href="#"><i class="icon-user icon-white"></i>&nbsp;&nbsp;${login}</a> 
 						</li>

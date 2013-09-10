@@ -16,13 +16,13 @@ public class AuthenticationInterceptor implements HandlerInterceptor
 	{
 		request.setCharacterEncoding("UTF-8");
 		// Если мы не влогинены - сначала посмотрим в кукисы
-		if (request.getCookies() != null && request.getSession().getAttribute("logins")==null)
+		if (request.getCookies() != null && request.getSession().getAttribute("sessionkey")==null)
 		{
 			for (Cookie c : request.getCookies())
 			{
 				if (c.getName().equals("loginc"))
 				{
-					request.getSession().setAttribute("logins", c.getValue());
+					request.getSession().setAttribute("sessionkey", c.getValue());
 					MongoConnector mc = new MongoConnector();
 					DBObject doc = mc.getUserByUID(c.getValue());
 					request.getSession().setAttribute("login", doc.get("login"));

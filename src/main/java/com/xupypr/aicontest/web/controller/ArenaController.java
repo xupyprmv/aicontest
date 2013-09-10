@@ -19,12 +19,12 @@ public class ArenaController
 	@RequestMapping(value = "/{action}", method = RequestMethod.GET)
 	public String doAction(@PathVariable String action, ModelMap model, HttpServletRequest request)
 	{
-		String login = (String) request.getSession().getAttribute("logins");
-		if (login != null && !login.equals(""))
+		MongoConnector mc = new MongoConnector();
+		String userId = mc.getUserIdBySessionKey((String) request.getSession().getAttribute("sessionkey"));
+		if (userId != null && !userId.equals(""))
 		{
 			boolean admin = request.getSession().getAttribute("login") != null
 					&& ((String) request.getSession().getAttribute("login")).equals("admin");
-			MongoConnector mc = new MongoConnector();
 			if (admin)
 			{
 				String id = request.getParameter("id") == null ? "" : request.getParameter("id");
@@ -43,17 +43,20 @@ public class ArenaController
 				}
 			} else
 			{
-				DBObject bot = mc.getBotByUserUID(login);
-				model.addAttribute("mybot", bot.get("_id").toString());
+				DBObject bot = mc.getBotByUserUID(userId);
+				
+				if (bot!=null) {					
+					model.addAttribute("mybot", bot.get("_id").toString());
+				}
 				
 				String id = request.getParameter("id") == null ? "" : request.getParameter("id");
-				if (action!=null && action.equals("view") && !id.equals("") && bot.get("user").toString().equals(login)) {
+				if (action!=null && action.equals("view") && !id.equals("") && bot.get("user").toString().equals(userId)) {
 					model.addAttribute("game", mc.getBotFight(id));
 					model.addAttribute("fight", mc.getBotFight(id));
 					return "fight";						
 				}
 				
-				model.addAttribute("events", mc.getArenaEvents(login));
+				model.addAttribute("events", mc.getArenaEvents(userId));
 			}
 			model.addAttribute("menuActiveItem", "arena");
 			return "arena";

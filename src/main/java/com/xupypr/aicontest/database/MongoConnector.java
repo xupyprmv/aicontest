@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 
 import org.bson.types.ObjectId;
 
@@ -27,9 +28,10 @@ import com.xupypr.aicontest.arena.DvonnField;
  * MongoDB
  * 
  * Database 	:	- aicontest
- * Collections	: 	- user
- * 					- bot
- * 					- event
+ * Collections	: 	- user // пользователь
+ * 					- bot // бот
+ * 					- event // событие
+ * 					- session // сессия
  */
 public class MongoConnector
 {
@@ -49,7 +51,57 @@ public class MongoConnector
 		}
 	}
 
+	/* AUTH BLOCK [START] */
+	public String addSessionKeyToUser(String userId)
+	{
+		if (userId == null || "".equals(userId))
+		{
+			return null;
+		}
+		WriteResult result = null;
+		result = mongo.getDB("aicontest").getCollection("session").remove(new BasicDBObject("userid", userId));
+		if (result.getError() != null && !result.getError().equals(""))
+		{
+			System.out.println("cann't remove old session : " + result.getError());
+		}
+
+		String key = UUID.randomUUID().toString();
+		BasicDBObject doc = new BasicDBObject()
+				.append("skey", key).append("userid", userId);
+		result = mongo.getDB("aicontest").getCollection("session").insert(doc);
+		if (result.getError() != null && !result.getError().equals(""))
+		{
+			System.out.println("cann't add session : " + result.getError());
+			return null;
+		}
+		return key;
+	}
+
+	public String getUserIdBySessionKey(String key)
+	{
+		if (key == null || "".equals(key))
+		{
+			return null;
+		} else
+		{
+			DBObject object = mongo.getDB("aicontest").getCollection("session").findOne(new BasicDBObject("skey", key));
+			return object.get("userid").toString();
+		}
+	}
+
+	/* AUTH BLOCK [END] */
+
 	/* EVENT BLOCK [START] */
+	/**
+	 * Создать событие
+	 * 
+	 * @param botUID1 - идентификатор бота
+	 * @param botUID2 - идентификатор бота
+	 * @param type - тип события
+	 * @param comment - комментарий
+	 * @param game - идентификатор игры
+	 * @return String - идентификатор сохранённого объекта MongoDB
+	 */
 	public String createEvent(String botUID1, String botUID2, String type, String comment, String game)
 	{
 		// Сохранение события
@@ -68,7 +120,13 @@ public class MongoConnector
 		}
 		return doc.getString("_id");
 	}
-	
+
+	/**
+	 * Извлечь событие по идентификатору
+	 * 
+	 * @param uid - идентификатор события
+	 * @return DBObject - событие в виде объекта MongoDB
+	 */
 	public DBObject getEventByUID(String uid)
 	{
 		return mongo.getDB("aicontest").getCollection("event").findOne(new BasicDBObject("_id", new ObjectId(uid)));
@@ -84,38 +142,55 @@ public class MongoConnector
 		int turnc = 1;
 		DvonnField field = new DvonnField();
 		Map<String, DvonnField> result = new LinkedHashMap<String, DvonnField>();
-		while (i<l) {
-			if (game.charAt(i)==' ') {
-				if (turn.length()==3) {
+		while (i < l)
+		{
+			if (game.charAt(i) == ' ')
+			{
+				if (turn.length() == 3)
+				{
 					field.applyTurn(1, turnc, turn.charAt(0), turn.substring(1));
 				}
-				if (turn.length()==5) {
+				if (turn.length() == 5)
+				{
 					field.applyTurn(2, turnc, turn.charAt(0), turn.substring(1));
 				}
 				result.put(turn, field.clone());
-				turn="";
+				turn = "";
 				turnc++;
-			} else {
-				turn+=game.charAt(i);
-			}			
+			} else
+			{
+				turn += game.charAt(i);
+			}
 			i++;
 		}
 		return result;
 	}
 
+	/**
+	 * Получить все события арены
+	 * @return список объектов MongoDB
+	 */
 	public List<DBObject> getAllArenaEvents()
 	{
 		DBCursor cursor = mongo.getDB("aicontest").getCollection("event")
 				.find().sort(new BasicDBObject("sdate", -1));
 		return cursor.toArray();
 	}
-	
+
+	/**
+	 * Получить событие арены для пользователя
+	 * @param userUID - идентификатор пользователя
+	 * @return список объектов MongoDB
+	 */
 	public List<DBObject> getArenaEvents(String userUID)
 	{
 		DBObject bot = getBotByUserUID(userUID);
-		
-		DBObject clause1 = new BasicDBObject("bot1", bot.get("_id").toString());  
-		DBObject clause2 = new BasicDBObject("bot2", bot.get("_id").toString());    
+		if (bot == null)
+		{
+			return new ArrayList<DBObject>(0);
+		}
+		DBObject clause1 = new BasicDBObject("bot1", bot.get("_id").toString());
+		DBObject clause2 = new BasicDBObject("bot2", bot.get("_id").toString());
 		BasicDBList or = new BasicDBList();
 		or.add(clause1);
 		or.add(clause2);
@@ -124,6 +199,10 @@ public class MongoConnector
 		return cursor.toArray();
 	}
 
+	/**
+	 * Удалить все события связанные с ботом
+	 * @param botUID - идентификатор бота
+	 */
 	public void deleteEventsByBotId(String botUID)
 	{
 		WriteResult result = null;
@@ -139,69 +218,89 @@ public class MongoConnector
 		}
 	}
 
+	/**
+	 * Сортировщик рейтинга
+	 */
 	private Comparator<DBObject> ratingComparator = new Comparator<DBObject>()
 	{
 
 		public int compare(DBObject o1, DBObject o2)
 		{
-			if (Integer.parseInt(o1.get("points").toString())>Integer.parseInt(o2.get("points").toString())) return -1;
-			if (Integer.parseInt(o1.get("points").toString())<Integer.parseInt(o2.get("points").toString())) return 1;
+			if (Integer.parseInt(o1.get("points").toString()) > Integer.parseInt(o2.get("points").toString()))
+				return -1;
+			if (Integer.parseInt(o1.get("points").toString()) < Integer.parseInt(o2.get("points").toString()))
+				return 1;
 			return 0;
 		}
 	};
 	private long count;
-	
+
+	/**
+	 * Получить рейтинг
+	 * 
+	 * @return список объектов MongoDB
+	 */
 	public List<DBObject> getRating()
 	{
 		// TODO кэширование
-		List<DBObject> result = new ArrayList<DBObject>(); 
+		List<DBObject> result = new ArrayList<DBObject>();
 		// запрашиваем всех ботов
 		DBCursor cursor = mongo.getDB("aicontest").getCollection("bot").find(new BasicDBObject("compiled", "SUCCESS"));
-		while (cursor.hasNext()) {
+		while (cursor.hasNext())
+		{
 			DBObject bot = cursor.next();
-			DBObject clause1 = new BasicDBObject("bot1", bot.get("_id").toString());  
-			DBObject clause2 = new BasicDBObject("bot2", bot.get("_id").toString());    
+			DBObject clause1 = new BasicDBObject("bot1", bot.get("_id").toString());
+			DBObject clause2 = new BasicDBObject("bot2", bot.get("_id").toString());
 			BasicDBList or = new BasicDBList();
 			or.add(clause1);
-			or.add(clause2);			
+			or.add(clause2);
 			DBCursor botEvents = mongo.getDB("aicontest").getCollection("event").find(new BasicDBObject("$or", or));
 			int w = 0;
 			int d = 0;
 			int l = 0;
 			Date lfdate = new Date(0);
-			while (botEvents.hasNext()) {
+			while (botEvents.hasNext())
+			{
 				DBObject event = botEvents.next();
-				if (((Date)event.get("sdate")).after(lfdate)) {
-					lfdate = (Date)event.get("sdate");
+				if (((Date) event.get("sdate")).after(lfdate))
+				{
+					lfdate = (Date) event.get("sdate");
 				}
-				if (event.get("type").equals("win")) {
-					if (event.get("bot1").toString().equals(bot.get("_id").toString())) {
+				if (event.get("type").equals("win"))
+				{
+					if (event.get("bot1").toString().equals(bot.get("_id").toString()))
+					{
 						w++;
-					} else {
+					} else
+					{
 						l++;
 					}
 				}
-				if (event.get("type").equals("loss")) {
-					if (event.get("bot1").toString().equals(bot.get("_id").toString())) {						
-						l++; 
-					} else {
+				if (event.get("type").equals("loss"))
+				{
+					if (event.get("bot1").toString().equals(bot.get("_id").toString()))
+					{
+						l++;
+					} else
+					{
 						w++;
 					}
 				}
-				if (event.get("type").equals("draw")) d++;
+				if (event.get("type").equals("draw"))
+					d++;
 			}
 			bot.put("lfdate", lfdate);
 			bot.put("wins", w);
 			bot.put("loses", l);
 			bot.put("draws", d);
-			bot.put("games", w+d+l);
-			bot.put("points", w*3+d);
+			bot.put("games", w + d + l);
+			bot.put("points", w * 3 + d);
 			result.add(bot);
 		}
 		Collections.sort(result, ratingComparator);
 		return result;
 	}
-	
+
 	/* EVENT BLOCK [END] */
 
 	/* BOT BLOCK [START] */
@@ -303,28 +402,40 @@ public class MongoConnector
 		Date lf = new Date();
 		DBObject bot1 = null;
 		// Выбираем первого бота - который раньше всех играл но ещё не доиграл 
-		for (DBObject bot:rating) {
-			if (((Date)bot.get("lfdate")).before(lf) && ((Integer)bot.get("games"))<fights*2*(rating.size()-1) && bot.get("compiled").toString().equals("SUCCESS")) {				
-				lf = (Date)bot.get("lfdate");
+		for (DBObject bot : rating)
+		{
+			if (((Date) bot.get("lfdate")).before(lf) && ((Integer) bot.get("games")) < fights * 2 * (rating.size() - 1)
+					&& bot.get("compiled").toString().equals("SUCCESS"))
+			{
+				lf = (Date) bot.get("lfdate");
 				bot1 = bot;
 			}
 		}
-		if (bot1==null) {
+		if (bot1 == null)
+		{
 			return null;
 		}
 		// Нужно найти боту соперника (TODO оптимизировать)
-		Random r = new Random(); 
-		for (int i=1;i<rating.size()*2;i++) {
+		Random r = new Random();
+		for (int i = 1; i < rating.size() * 2; i++)
+		{
 			DBObject bot = rating.get(r.nextInt(rating.size()));
-			if (!bot.get("_id").toString().equals(bot1.get("_id").toString()) && ((Integer)bot.get("games"))<fights*2*(rating.size()-1) && bot.get("compiled").toString().equals("SUCCESS")) {
-				count = mongo.getDB("aicontest").getCollection("event").count(new BasicDBObject("bot1",bot1.get("_id").toString()).append("bot2", bot.get("_id").toString()));
-				if (count<fights) {
+			if (!bot.get("_id").toString().equals(bot1.get("_id").toString())
+					&& ((Integer) bot.get("games")) < fights * 2 * (rating.size() - 1)
+					&& bot.get("compiled").toString().equals("SUCCESS"))
+			{
+				count = mongo.getDB("aicontest").getCollection("event")
+						.count(new BasicDBObject("bot1", bot1.get("_id").toString()).append("bot2", bot.get("_id").toString()));
+				if (count < fights)
+				{
 					result.add(bot1);
 					result.add(bot);
 					return result;
 				}
-				count = mongo.getDB("aicontest").getCollection("event").count(new BasicDBObject("bot2",bot1.get("_id").toString()).append("bot1", bot.get("_id").toString()));
-				if (count<fights) {
+				count = mongo.getDB("aicontest").getCollection("event")
+						.count(new BasicDBObject("bot2", bot1.get("_id").toString()).append("bot1", bot.get("_id").toString()));
+				if (count < fights)
+				{
 					result.add(bot);
 					result.add(bot1);
 					return result;

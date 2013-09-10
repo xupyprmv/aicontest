@@ -7,8 +7,8 @@
 			<h3>Какие языки программирования/компиляторы поддерживаются?</h3>
 			<p>
 			<ol>
-				<li>Pascal / Free Pascal 2.4.4 (fpc -So -XS %1 -o%name%.sh)</li>
-				<li>Java / OpenJDK 1.6.0.24 (javac -cp ".;*" %1)</li>
+				<li>Pascal / Free Pascal 2.4.4-3.1 (fpc -So -XS %1 -o%name%.sh)</li>
+				<li>Java / OpenJDK 1.6.0.27 (javac -cp ".;*" %1)</li>
 				<li>C++ / GNU C++ 4.6.3 (g++ -static
 					-fno-optimize-sibling-calls -fno-strict-aliasing -lm -s -x c++ -O2
 					-o %name%.sh %1)</li>
